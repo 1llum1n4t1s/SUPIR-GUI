@@ -1,0 +1,170 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SUPIR_GUI.ViewModels"
+        xmlns:ctrl="using:SUPIR_GUI.Controls"
+        xmlns:conv="using:SUPIR_GUI.Converters"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="780" d:DesignHeight="600"
+        x:Class="SUPIR_GUI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="SUPIR-GUI"
+        Width="780" Height="550"
+        CanResize="False">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <!-- Root panel for layering main content + init overlay -->
+    <Panel>
+
+        <!-- ===== Main Content ===== -->
+        <DockPanel IsVisible="{Binding IsInitialized}">
+
+            <!-- Top App Bar -->
+            <Border DockPanel.Dock="Top"
+                    Background="#7C4DFF"
+                    Padding="16,10">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="SUPIR-GUI"
+                               FontSize="18" FontWeight="Bold"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="|"
+                               FontSize="16" Foreground="#B0FFFFFF"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="画像超解像ツール"
+                               FontSize="14" Foreground="#D0FFFFFF"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding VersionDisplay}"
+                               FontSize="11" Foreground="#90FFFFFF"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- Bottom: Start Button + Progress -->
+            <ctrl:StartButtonAndProgressBar DockPanel.Dock="Bottom"
+                                            Margin="0,8,0,0" />
+
+            <!-- Scrollable Settings Area -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="0">
+                <StackPanel Margin="24,16,24,8" Spacing="0">
+
+                    <!-- IO Form Control -->
+                    <ctrl:IoFormControl Margin="0,0,0,12" />
+
+                    <!-- Upscale Ratio + Output Format -->
+                    <StackPanel Orientation="Horizontal" Spacing="24" Margin="0,8,0,0">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="拡大率" Classes="sectionLabel" />
+                            <ComboBox SelectedIndex="{Binding UpscaleRatioIndex}"
+                                      Width="140">
+                                <ComboBoxItem Content="2倍" />
+                                <ComboBoxItem Content="3倍" />
+                                <ComboBoxItem Content="4倍" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="保存形式" Classes="sectionLabel" />
+                            <ComboBox SelectedIndex="{Binding OutputFormatIndex}"
+                                      Width="180">
+                                <ComboBoxItem Content="PNG形式 (.png)" />
+                                <ComboBoxItem Content="JPEG形式 (.jpg)" />
+                                <ComboBoxItem Content="WebP形式 (.webp)" />
+                                <ComboBoxItem Content="HEIC形式 (.heic)" />
+                            </ComboBox>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Seed -->
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="シード" Classes="sectionLabel" />
+                            <TextBox Text="{Binding SeedText}"
+                                     Watermark="シード値"
+                                     Width="160"
+                                     IsEnabled="{Binding IsSeedEnabled}" />
+                        </StackPanel>
+                        <CheckBox Content="ランダム"
+                                  IsChecked="{Binding UseRandomSeed}"
+                                  VerticalAlignment="Bottom"
+                                  Margin="0,0,0,4" />
+                    </StackPanel>
+
+
+
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+
+        <!-- ===== Initialization Overlay ===== -->
+        <Border IsVisible="{Binding !IsInitialized}"
+                Background="#E0FFFFFF"
+                ZIndex="100">
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="16"
+                        Width="400">
+                <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                        CornerRadius="8"
+                        Padding="32,24"
+                        BoxShadow="0 4 16 0 #40000000">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="SUPIR-GUI のセットアップ"
+                                   FontSize="18" FontWeight="Bold"
+                                   HorizontalAlignment="Center" />
+
+                        <!-- Tool download state -->
+                        <StackPanel IsVisible="{Binding IsToolDownloading}" Spacing="8">
+                            <TextBlock Text="{Binding ToolDownloadStepText}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding ToolDownloadStatus}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       HorizontalAlignment="Center" />
+                            <ProgressBar IsIndeterminate="{Binding ToolDownloadProgress, Converter={x:Static conv:NullableDoubleToIsIndeterminateConverter.Instance}}"
+                                         Value="{Binding ToolDownloadProgress}"
+                                         Minimum="0" Maximum="100"
+                                         Height="16" />
+                            <TextBlock Text="{Binding ToolDownloadDetail}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       HorizontalAlignment="Center"
+                                       MaxWidth="360" />
+                            <TextBlock Text="初回起動時のみ実行されます。しばらくお待ちください..."
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <!-- Failure state -->
+                        <StackPanel IsVisible="{Binding InitializationFailed}" Spacing="12">
+                            <TextBlock Text="{Binding ToolDownloadStatus}"
+                                       FontSize="13"
+                                       TextWrapping="Wrap"
+                                       Foreground="Red"
+                                       HorizontalAlignment="Center" />
+                            <Button Content="再試行"
+                                    Command="{Binding RetryInitializeCommand}"
+                                    HorizontalAlignment="Center"
+                                    Padding="24,8" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+    </Panel>
+</Window>

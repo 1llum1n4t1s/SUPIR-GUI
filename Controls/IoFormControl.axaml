@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:SUPIR_GUI.ViewModels"
+             xmlns:ctrl="using:SUPIR_GUI.Controls"
+             mc:Ignorable="d"
+             x:Class="SUPIR_GUI.Controls.IoFormControl"
+             x:DataType="vm:MainWindowViewModel">
+
+    <TabControl SelectedIndex="{Binding IoFormMode, Converter={x:Static ctrl:IoFormModeToIndexConverter.Instance}}"
+                Margin="0">
+
+        <!-- ファイル選択タブ -->
+        <TabItem Header="ファイル選択">
+            <StackPanel Margin="12,12,12,8" Spacing="8">
+                <!-- 入力ファイル -->
+                <TextBlock Text="拡大元の画像ファイル" Classes="sectionLabel" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0"
+                             Text="{Binding InputFilePath}"
+                             Watermark="画像ファイルのパスを入力..."
+                             IsReadOnly="True" />
+                    <Button Grid.Column="1"
+                            Content="ファイルを選択"
+                            Margin="8,0,0,0"
+                            Name="BrowseInputFileButton"
+                            Click="BrowseInputFile_Click" />
+                </Grid>
+
+                <!-- 出力ファイル -->
+                <TextBlock Text="保存先のファイルパス" Classes="sectionLabel" Margin="0,4,0,4" />
+                <TextBox Text="{Binding OutputFilePath}"
+                         Watermark="出力先のパスが自動入力されます" />
+            </StackPanel>
+        </TabItem>
+
+        <!-- フォルダ選択タブ -->
+        <TabItem Header="フォルダ選択（一括処理）">
+            <StackPanel Margin="12,12,12,8" Spacing="8">
+                <!-- 入力フォルダ -->
+                <TextBlock Text="拡大元の画像フォルダ" Classes="sectionLabel" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0"
+                             Text="{Binding InputFolderPath}"
+                             Watermark="画像フォルダのパスを入力..."
+                             IsReadOnly="True" />
+                    <Button Grid.Column="1"
+                            Content="フォルダを選択"
+                            Margin="8,0,0,0"
+                            Name="BrowseInputFolderButton"
+                            Click="BrowseInputFolder_Click" />
+                </Grid>
+
+                <!-- 出力フォルダ -->
+                <TextBlock Text="保存先のフォルダパス" Classes="sectionLabel" Margin="0,4,0,4" />
+                <TextBox Text="{Binding OutputFolderPath}"
+                         Watermark="出力先のパスが自動入力されます" />
+            </StackPanel>
+        </TabItem>
+    </TabControl>
+</UserControl>

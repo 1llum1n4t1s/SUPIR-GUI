@@ -1,0 +1,9 @@
+.cursor/
+.idea/
+.vs/
+.vscode/
+*.csproj.user
+*.suo
+bin/
+obj/
+build_output.txt
