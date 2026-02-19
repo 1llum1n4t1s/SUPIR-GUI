@@ -1,0 +1,38 @@
+name: .NET ビルド
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    name: .NET ビルド
+    runs-on: windows-latest
+    if: ${{ !startsWith(github.ref, 'refs/heads/release/') }}
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: .NET SDK をセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: アイコン生成
+        shell: pwsh
+        run: .\icon\generate_icon.ps1
+
+      - name: 依存関係を復元
+        run: dotnet restore SUPIR-GUI.slnx
+
+      - name: ビルド
+        run: dotnet build SUPIR-GUI.slnx --configuration Release --no-restore
+
+      - name: ビルド成果物をアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-release
+          path: |
+            bin/**/Release/**/*.exe
+            bin/**/Release/**/*.dll
+            !bin/**/Release/**/ref/**
+          retention-days: 1

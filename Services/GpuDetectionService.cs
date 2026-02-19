@@ -31,15 +31,19 @@ public static class GpuDetectionService
 
             using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
             List<string> gpuNames = [];
-            foreach (var obj in searcher.Get())
+            // ManagementObjectCollection も IDisposable — using で確実に解放 (B2-BUG-11)
+            using var results = searcher.Get();
+            foreach (ManagementObject obj in results)
             {
-                var name = obj["Name"]?.ToString() ?? "";
-                if (!string.IsNullOrEmpty(name))
+                using (obj)
                 {
-                    gpuNames.Add(name.ToLower());
-                    Log($"検出されたGPU: {name}", LogLevel.Debug);
+                    var name = obj["Name"]?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        gpuNames.Add(name.ToLower());
+                        Log($"検出されたGPU: {name}", LogLevel.Debug);
+                    }
                 }
-                obj?.Dispose();
             }
 
             // NVIDIA GPU → CUDA

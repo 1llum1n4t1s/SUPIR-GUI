@@ -95,11 +95,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>ガイダンススケール (固定値)</summary>
     private const double GuidanceScale = 6.0;
 
-    [ObservableProperty]
-    private string _seedText = "";
-
-    [ObservableProperty]
-    private bool _useRandomSeed = true;
+    // シード値: 常にランダム（推奨設定）
 
     /// <summary>s_stage1 推奨固定値</summary>
     private const double SStage1 = -1.0;
@@ -118,14 +114,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     /// <summary>タイリング使用 推奨固定値</summary>
     private const bool UseTiling = true;
-
-    // ========== Computed ==========
-    public bool IsSeedEnabled => !UseRandomSeed;
-
-    partial void OnUseRandomSeedChanged(bool value)
-    {
-        OnPropertyChanged(nameof(IsSeedEnabled));
-    }
 
     // ========== Upscale Ratio Helpers ==========
     private int UpscaleFactor => UpscaleRatioIndex switch
@@ -197,9 +185,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void LoadFromSettings()
     {
-        UseRandomSeed = _settings.UseRandomSeed;
-        SeedText = _settings.Seed?.ToString() ?? "";
-
         UpscaleRatioIndex = _settings.UpscaleFactor switch
         {
             3 => 1,
@@ -219,8 +204,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private void SaveToSettings()
     {
         _settings.UpscaleFactor = UpscaleFactor;
-        _settings.UseRandomSeed = UseRandomSeed;
-        _settings.Seed = long.TryParse(SeedText, out var seed) ? seed : null;
         _settings.OutputFormat = OutputFormatString switch
         {
             "jpg" => "Jpg",
@@ -347,8 +330,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            long? seed = UseRandomSeed ? null :
-                (long.TryParse(SeedText, out var s) ? s : null);
+            long? seed = null; // 常にランダム（推奨設定）
 
             if (IoFormMode == IoFormMode.FileSelection)
             {

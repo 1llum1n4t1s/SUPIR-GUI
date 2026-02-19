@@ -77,11 +77,10 @@ public sealed partial class SupirWrapperService : IDisposable
         _workerOutput = _workerProcess.StandardOutput;
 
         // stderrをバックグラウンドで収集（tqdm進捗パース + エラー診断用）
+        // 診断用バッファは最大64KB に制限（メモリ無制限増大を防止）
+        const int MaxStderrChars = 64 * 1024;
         var stderrCollector = new StringBuilder();
-        _ = Task.Run(() => MonitorStderr(_workerProcess.StandardError, stderrCollector));
-
-        // Pythonプロセスの初期化を待機
-        await Task.Delay(500);
+        _ = Task.Run(() => MonitorStderr(_workerProcess.StandardError, stderrCollector, MaxStderrChars));
 
         // プロセスが即座に終了していないか確認
         if (_workerProcess.HasExited)
@@ -221,6 +220,16 @@ public sealed partial class SupirWrapperService : IDisposable
                         continue;
                     }
 
+                    // progress メッセージ: ワーカーがまだ動作中であることを示す
+                    // ハートビート。タイムアウトをリセットして待機を継続する。
+                    if (response.Status == "progress")
+                    {
+                        Log($"ワーカー進捗: {response.Message}", LogLevel.Debug);
+                        // CancelAfter を再設定してタイムアウトをリセット
+                        cts.CancelAfter(effectiveTimeout);
+                        continue;
+                    }
+
                     return response;
                 }
                 catch (JsonException)
@@ -243,14 +252,15 @@ public sealed partial class SupirWrapperService : IDisposable
     /// </summary>
     /// <param name="stderr">stderrのストリームリーダー</param>
     /// <param name="collector">stderr出力を収集するStringBuilder (診断用)</param>
-    private void MonitorStderr(StreamReader stderr, StringBuilder? collector = null)
+    private void MonitorStderr(StreamReader stderr, StringBuilder? collector = null, int maxCollectorChars = int.MaxValue)
     {
         try
         {
             while (stderr.ReadLine() is { } line)
             {
                 Log($"[Worker] {line}", LogLevel.Debug);
-                collector?.AppendLine(line);
+                if (collector != null && collector.Length < maxCollectorChars)
+                    collector.AppendLine(line);
 
                 var match = TqdmProgressRegex().Match(line);
                 if (match.Success)
@@ -260,10 +270,18 @@ public sealed partial class SupirWrapperService : IDisposable
                     {
                         if (match.Groups["current"].Success && match.Groups["total"].Success)
                         {
-                            if (int.TryParse(match.Groups["current"].Value, out var current) &&
-                                int.TryParse(match.Groups["total"].Value, out var total))
+                            // tqdm は "1.5MB/2.0GB" のように小数値を出力する場合がある。
+                            // double.TryParse (InvariantCulture) でパースし int に変換 (B2-BUG-17)
+                            if (double.TryParse(match.Groups["current"].Value,
+                                    System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    out var currentD) &&
+                                double.TryParse(match.Groups["total"].Value,
+                                    System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    out var totalD))
                             {
-                                OnProcessingProgress?.Invoke(current, total);
+                                OnProcessingProgress?.Invoke((int)currentD, (int)totalD);
                             }
                         }
                     }

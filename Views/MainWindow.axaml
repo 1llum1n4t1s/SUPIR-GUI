@@ -9,7 +9,7 @@
         d:DesignWidth="780" d:DesignHeight="600"
         x:Class="SUPIR_GUI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/app.ico"
         Title="SUPIR-GUI"
         Width="780" Height="550"
         CanResize="False">
@@ -82,20 +82,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Seed -->
-                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="シード" Classes="sectionLabel" />
-                            <TextBox Text="{Binding SeedText}"
-                                     Watermark="シード値"
-                                     Width="160"
-                                     IsEnabled="{Binding IsSeedEnabled}" />
-                        </StackPanel>
-                        <CheckBox Content="ランダム"
-                                  IsChecked="{Binding UseRandomSeed}"
-                                  VerticalAlignment="Bottom"
-                                  Margin="0,0,0,4" />
-                    </StackPanel>
+                    <!-- Seed: 常にランダム（推奨設定） -->
 
 
 

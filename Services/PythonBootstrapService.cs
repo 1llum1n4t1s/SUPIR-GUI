@@ -278,6 +278,9 @@ public partial class PythonBootstrapService
             await CloneSupirRepositoryAsync(
                 detail => onProgress?.Invoke(10, totalSteps, "SUPIR リポジトリを取得中...", detail));
 
+            // 10.5: SUPIRリポジトリに非CUDA対応パッチを適用
+            PatchSupirRepository();
+
             // 11: SUPIR追加依存パッケージ (ホイールが確実にあるもの)
             onProgress?.Invoke(11, totalSteps, "SUPIR 追加依存をインストール中 (1/2)...", null);
             await InstallPackagesAsync(
@@ -447,8 +450,10 @@ public partial class PythonBootstrapService
         try
         {
             Log("ライブラリの更新確認を開始...", LogLevel.Info);
+            // --target は pip install 専用オプション。pip list --outdated では
+            // --path でインストール先を指定する (B2-BUG-13: --target は無効)
             var result = await RunPythonCommandAsync(
-                $"-m pip list --outdated --format=columns --target \"{SitePackagesPath}\"");
+                $"-m pip list --outdated --format=columns --path \"{SitePackagesPath}\"");
 
             if (result.ExitCode != 0)
             {
@@ -662,6 +667,12 @@ public partial class PythonBootstrapService
         var pthFiles = Directory.GetFiles(_pythonEmbedDir, "python*._pth");
         if (pthFiles.Length == 0) return;
 
+        // 複数ファイルがある場合は警告し、アルファベット順で最初のものを選択 (B2-BUG-08)
+        if (pthFiles.Length > 1)
+        {
+            Log($"複数の ._pth ファイルが見つかりました ({pthFiles.Length} 個)。最初のファイルを使用します: {string.Join(", ", pthFiles.Select(Path.GetFileName))}", LogLevel.Warning);
+            Array.Sort(pthFiles, StringComparer.OrdinalIgnoreCase);
+        }
         var pthFile = pthFiles[0];
         var content = File.ReadAllText(pthFile);
 
@@ -736,6 +747,61 @@ public partial class PythonBootstrapService
 
         Log("SUPIRリポジトリのクローンが完了しました。", LogLevel.Info);
         onDetail?.Invoke("クローン完了");
+    }
+
+    /// <summary>
+    /// SUPIRリポジトリのソースコードにパッチを当てる。
+    /// upstream の sampling.py が device='cuda' をハードコードしているため、
+    /// DirectML / CPU 環境でも動作するよう修正する。
+    /// </summary>
+    private void PatchSupirRepository()
+    {
+        var samplingPy = Path.Combine(SupirRepoPath, "sgm", "modules", "diffusionmodules", "sampling.py");
+        if (!File.Exists(samplingPy))
+        {
+            Log($"パッチ対象ファイルが見つかりません: {samplingPy}", LogLevel.Warning);
+            return;
+        }
+
+        var content = File.ReadAllText(samplingPy);
+        var patched = false;
+
+        // gaussian_weights の device='cuda' を device='cpu' に変更
+        const string cudaDevice = "device='cuda'";
+        const string cpuDevice = "device='cpu'";
+        if (content.Contains(cudaDevice))
+        {
+            content = content.Replace(cudaDevice, cpuDevice);
+            patched = true;
+        }
+
+        // tile_weights の使用箇所で .to(x.device) を挿入
+        const string oldRepeat = "self.tile_weights.repeat(b,";
+        const string newRepeat = "self.tile_weights.to(x.device).repeat(b,";
+        if (content.Contains(oldRepeat) && !content.Contains(newRepeat))
+        {
+            content = content.Replace(oldRepeat, newRepeat);
+            patched = true;
+        }
+
+        // repeat の前にスペースがある場合にも対応
+        const string oldRepeatSpaced = "self.tile_weights.repeat(b, ";
+        const string newRepeatSpaced = "self.tile_weights.to(x.device).repeat(b, ";
+        if (content.Contains(oldRepeatSpaced) && !content.Contains(newRepeatSpaced))
+        {
+            content = content.Replace(oldRepeatSpaced, newRepeatSpaced);
+            patched = true;
+        }
+
+        if (patched)
+        {
+            File.WriteAllText(samplingPy, content);
+            Log("SUPIRリポジトリにパッチを適用しました (sampling.py: device='cuda' → device='cpu', tile_weights デバイス移動追加)", LogLevel.Info);
+        }
+        else
+        {
+            Log("SUPIRリポジトリのパッチは既に適用済みです。", LogLevel.Debug);
+        }
     }
 
     /// <summary>
@@ -896,6 +962,7 @@ public partial class PythonBootstrapService
         if (!Directory.Exists(SupirRepoPath) || !File.Exists(Path.Combine(SupirRepoPath, "options", "SUPIR_v0.yaml")))
         {
             await CloneSupirRepositoryAsync();
+            PatchSupirRepository();
         }
 
         await EnsureSupirModelAssetsAsync();
@@ -1323,6 +1390,11 @@ public partial class PythonBootstrapService
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             await process.WaitForExitAsync();
+            // 非同期イベントキューをフラッシュする (B2-BUG-12)
+            // WaitForExitAsync() だけでは OutputDataReceived/ErrorDataReceived
+            // イベントがすべて届く前に制御が戻る場合がある。
+            // 引数なしの WaitForExit() を追加することで確実にフラッシュする。
+            process.WaitForExit();
 
             string stdout, stderr;
             lock (outputLock)
@@ -1336,9 +1408,13 @@ public partial class PythonBootstrapService
         else
         {
             process.Start();
-            var stdout = await process.StandardOutput.ReadToEndAsync();
-            var stderr = await process.StandardError.ReadToEndAsync();
+            // Read stdout and stderr concurrently to avoid deadlock
+            // when OS pipe buffer fills up on one stream
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
             return new ProcessResult(process.ExitCode, stdout, stderr);
         }
     }
